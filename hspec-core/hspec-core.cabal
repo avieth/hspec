@@ -70,6 +70,7 @@ library
       Test.Hspec.Core.Formatters
       Test.Hspec.Core.Formatters.V1
       Test.Hspec.Core.Formatters.V2
+      Test.Hspec.Core.Formatters.GithubAction
       Test.Hspec.Core.QuickCheck
       Test.Hspec.Core.Util
   other-modules:
