@@ -62,7 +62,7 @@ itemDone item = case itemResult item of
     -- If we have both locations, then we print the location of the failure
     -- as the message at the location of the spec "it"
     formatFailure (Just loc) (Just loc') reason = mapM_ writeLine
-      [ (formatLocation loc  ++ ":" ++ formatLocation loc')
+      [ (formatLocation loc  ++ ":" ++ formatLocation loc' ++ "\NUL")
       , (formatLocation loc' ++ ":" ++ formatReason reason)
       ]
 
