@@ -65,6 +65,8 @@ module Test.Hspec.Core.Formatters.V2 (
 -- ** Helpers
 , formatLocation
 , formatException
+, defaultFailedFormatter
+
 
 #ifdef TEST
 , Chunk(..)

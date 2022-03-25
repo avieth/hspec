@@ -24,6 +24,7 @@ import           Test.Hspec.Core.Example (Params(..), defaultParams)
 import           Test.Hspec.Core.Format (Format, FormatConfig)
 import qualified Test.Hspec.Core.Formatters.V1 as V1
 import qualified Test.Hspec.Core.Formatters.V2 as V2
+import qualified Test.Hspec.Core.Formatters.GithubAction as GA
 import           Test.Hspec.Core.Util
 
 import           GetOpt.Declarative
@@ -69,6 +70,7 @@ data Config = Config {
 , configFormatter :: Maybe V1.Formatter -- ^ deprecated, use `configFormat` instead
 , configHtmlOutput :: Bool
 , configConcurrentJobs :: Maybe Int
+, configJsonFailureReport :: Maybe FilePath
 }
 
 defaultConfig :: Config
@@ -103,11 +105,13 @@ defaultConfig = Config {
   , ("progress", V2.progress)
   , ("failed-examples", V2.failed_examples)
   , ("silent", V2.silent)
+  , ("github-action", GA.formatter)
   ]
 , configFormat = Nothing
 , configFormatter = Nothing
 , configHtmlOutput = False
 , configConcurrentJobs = Nothing
+, configJsonFailureReport = Nothing
 }
 
 option :: String -> OptionSetter config -> String -> Option config
@@ -233,6 +237,7 @@ runnerOptions = [
   , mkFlag "randomize" setRandomize "randomize execution order"
   , mkOptionNoArg "rerun" (Just 'r') setRerun "rerun all examples that failed in the previous test run (only works in combination with --failure-report or in GHCi)"
   , option "failure-report" (argument "FILE" return setFailureReport) "read/write a failure report for use with --rerun"
+  , mkOption "json-failure-report" Nothing (argument "FILE" readJsonFailureReport setJsonFailureReport) helpForJsonFailureReport
   , mkOptionNoArg "rerun-all-on-success" Nothing setRerunAllOnSuccess "run the whole test suite after a previously failing rerun succeeds for the first time (only works in combination with --rerun)"
   , mkOption "jobs" (Just 'j') (argument "N" readMaxJobs setMaxJobs) "run at most N parallelizable tests simultaneously (default: number of available processors)"
   ]
@@ -266,6 +271,16 @@ runnerOptions = [
 
     setRerun config = config {configRerun = True}
     setRerunAllOnSuccess config = config {configRerunAllOnSuccess = True}
+
+    helpForJsonFailureReport :: String
+    helpForJsonFailureReport = "write failure information in JSON format to this file"
+
+    readJsonFailureReport :: String -> Maybe FilePath
+    readJsonFailureReport = Just
+
+    setJsonFailureReport :: FilePath -> Config -> Config
+    setJsonFailureReport fp c = c { configJsonFailureReport = Just fp }
+
 
 commandLineOnlyOptions :: [Option Config]
 commandLineOnlyOptions = [

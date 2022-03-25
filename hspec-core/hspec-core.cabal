@@ -36,6 +36,7 @@ library
   build-depends:
       HUnit ==1.6.*
     , QuickCheck >=2.13.1
+    , aeson
     , ansi-terminal >=0.6.2
     , array
     , base >=4.5.0.0 && <5
@@ -70,6 +71,7 @@ library
       Test.Hspec.Core.Formatters
       Test.Hspec.Core.Formatters.V1
       Test.Hspec.Core.Formatters.V2
+      Test.Hspec.Core.Formatters.GithubAction
       Test.Hspec.Core.QuickCheck
       Test.Hspec.Core.Util
   other-modules:
