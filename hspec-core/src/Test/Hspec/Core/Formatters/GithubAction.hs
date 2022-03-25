@@ -67,13 +67,13 @@ itemDone item = case itemResult item of
       ]
 
 formatReason :: FailureReason -> String
-formatReason NoReason = ""
-formatReason (Reason string) = removeNULs string
-formatReason (ExpectedButGot mStr1 str2 str3) = removeNULs $ unlines lines'
+formatReason NoReason = "\NUL"
+formatReason (Reason string) = removeNULs string ++ "\NUL"
+formatReason (ExpectedButGot mStr1 str2 str3) = removeNULs (unlines lines') ++ "\NUL"
   where
     -- FIXME what is the optional string and where should it go?
     lines' = maybe id (:) mStr1 ["expected: " ++ str2, " but got: " ++ str3]
-formatReason (Error mStr someException) = removeNULs $ unlines lines'
+formatReason (Error mStr someException) = removeNULs (unlines lines') ++ "\NUL"
   where
     -- FIXME what is the optional string and where should it go?
     lines' = maybe id (:) mStr [show someException]
