@@ -85,7 +85,7 @@ import           Test.Hspec.Core.Config
 import           Test.Hspec.Core.Format (FormatConfig(..))
 import qualified Test.Hspec.Core.Formatters.V1 as V1
 import qualified Test.Hspec.Core.Formatters.V2 as V2
-import qualified Test.Hspec.Core.Formatters.GithubAction as GA
+import qualified Test.Hspec.Core.Formatters.JSON as JSON
 import           Test.Hspec.Core.FailureReport
 import           Test.Hspec.Core.QuickCheckUtil
 import           Test.Hspec.Core.Shuffle
@@ -358,7 +358,7 @@ dumpFailureReport config seed qcArgs xs = do
     }
   case configJsonFailureReport config of
     Nothing -> pure ()
-    Just fp -> GA.writeFailureReport xs fp
+    Just fp -> JSON.writeFailureReport xs fp
 
 doNotLeakCommandLineArgumentsToExamples :: IO a -> IO a
 doNotLeakCommandLineArgumentsToExamples = withArgs []

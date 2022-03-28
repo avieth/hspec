@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Hspec.Core.Formatters.GithubAction (
-  formatter
-, itemToJSON
+module Test.Hspec.Core.Formatters.JSON (
+  itemToJSON
 , failureRecordToJSON
 , writeFailureReport
 ) where
@@ -14,9 +13,6 @@ import Test.Hspec.Core.Format
 import Test.Hspec.Core.Formatters.Internal
 import Test.Hspec.Core.Util (joinPath)
 import qualified Test.Hspec.Core.Formatters.V2 as V2
-
-formatter :: Formatter
-formatter = V2.failed_examples
 
 writeFailureReport :: [(Path, V2.Item)] -> FilePath -> IO ()
 writeFailureReport xs path = A.encodeFile path
