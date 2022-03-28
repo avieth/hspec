@@ -85,6 +85,7 @@ import           Test.Hspec.Core.Config
 import           Test.Hspec.Core.Format (FormatConfig(..))
 import qualified Test.Hspec.Core.Formatters.V1 as V1
 import qualified Test.Hspec.Core.Formatters.V2 as V2
+import qualified Test.Hspec.Core.Formatters.GithubAction as GA
 import           Test.Hspec.Core.FailureReport
 import           Test.Hspec.Core.QuickCheckUtil
 import           Test.Hspec.Core.Shuffle
@@ -301,7 +302,7 @@ runEvalTree config spec = do
 
   let failures = filter resultItemIsFailure results
 
-  dumpFailureReport config seed qcArgs (map fst failures)
+  dumpFailureReport config seed qcArgs failures
 
   return Summary {
     summaryExamples = length results
@@ -346,15 +347,18 @@ toEvalItemForest params = bimapForest withUnit toEvalItem . filterForest itemIsF
     withUnit :: ActionWith () -> IO ()
     withUnit action = action ()
 
-dumpFailureReport :: Config -> Integer -> QC.Args -> [Path] -> IO ()
+dumpFailureReport :: Config -> Integer -> QC.Args -> [(Path, V2.Item)] -> IO ()
 dumpFailureReport config seed qcArgs xs = do
   writeFailureReport config FailureReport {
       failureReportSeed = seed
     , failureReportMaxSuccess = QC.maxSuccess qcArgs
     , failureReportMaxSize = QC.maxSize qcArgs
     , failureReportMaxDiscardRatio = QC.maxDiscardRatio qcArgs
-    , failureReportPaths = xs
+    , failureReportPaths = fmap fst xs
     }
+  case configJsonFailureReport config of
+    Nothing -> pure ()
+    Just fp -> GA.writeFailureReport xs fp
 
 doNotLeakCommandLineArgumentsToExamples :: IO a -> IO a
 doNotLeakCommandLineArgumentsToExamples = withArgs []

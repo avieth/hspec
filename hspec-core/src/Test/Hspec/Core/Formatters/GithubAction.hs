@@ -1,85 +1,93 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Test.Hspec.Core.Formatters.GithubAction (
   formatter
+, itemToJSON
+, failureRecordToJSON
+, writeFailureReport
 ) where
 
+import qualified Data.Aeson as A
+import Data.Maybe (mapMaybe)
+import Data.String (fromString)
 import Test.Hspec.Core.Format
 import Test.Hspec.Core.Formatters.Internal
+import Test.Hspec.Core.Util (joinPath)
+import qualified Test.Hspec.Core.Formatters.V2 as V2
 
 formatter :: Formatter
-formatter = Formatter {
-  formatterStarted = pure ()
-, formatterGroupStarted = const (pure ())
-, formatterGroupDone = const (pure ())
-, formatterProgress = \_ _ -> pure ()
-, formatterItemStarted = const (pure ())
-, formatterItemDone = const itemDone
-, formatterDone = pure ()
-}
+formatter = V2.failed_examples
 
--- | Lines are of the form
---
---   <file>:<line>:<column>:<message>\NUL
---
--- so that it can be matched this regex in a github actions problem matcher
---
---   {
---     "regexp": "^(.+):(\\d+):(\\d+):(.+)\\0",
---     "file": 1,
---     "line": 2,
---     "column": 3,
---     "message": 4
---   }
---
--- Any appearance of \NUL in the message will be removed, so that they
--- aren't truncated. That should be fine though because we would never want
--- a \NUL in the github alert message anyway.
---
--- The location of the program that actually failed is used, unless it's
--- not available, in which case the location of the spec is used. If neither
--- location is available then nothing is output.
-itemDone :: Item -> FormatM ()
-itemDone item = case itemResult item of
-    Success -> pure ()
-    Pending _ _ -> pure ()
-    Failure mFailureLoc failureReason -> formatFailure (itemLocation item) mFailureLoc failureReason
-
+writeFailureReport :: [(Path, V2.Item)] -> FilePath -> IO ()
+writeFailureReport xs path = A.encodeFile path
+    (A.toJSON (failureRecordToJSON <$> records))
   where
+    records = flip mapMaybe xs $ \(path', item) -> case itemResult item of
+      Success -> Nothing
+      Pending _ _ -> Nothing
+      Failure mLoc reason -> Just $ FailureRecord
+        { failureRecordLocation = mLoc
+        , failureRecordPath = path'
+        , failureRecordMessage = reason
+        }
 
-    -- The second first argument is the location of the "it" spec.
+itemToJSON :: Item -> A.Value
+itemToJSON it = A.object
+  [ "location" A..= (locationToJSON       <$> itemLocation it)
+  , "duration" A..= (secondsToJSON         $  itemDuration it)
+  , "info"     A..= (A.String . fromString $  itemInfo it)
+  , "result"   A..= (resultToJSON          $  itemResult it)
+  ]
 
-    formatFailure :: Maybe Location -> Maybe Location -> FailureReason -> FormatM ()
+failureRecordToJSON :: FailureRecord -> A.Value
+failureRecordToJSON fr = A.object
+  [ "location" A..= (locationToJSON      <$> failureRecordLocation fr)
+  , "path"     A..= (pathToJSON           $  failureRecordPath fr)
+  , "reason"   A..= (failureReasonToJSON  $  failureRecordMessage fr)
+  ]
 
-    -- No location info means it's useless to us.
-    formatFailure Nothing Nothing _ = pure ()
+pathToJSON :: Path -> A.Value
+pathToJSON = A.String . fromString . joinPath
 
-    -- We have the location of the failing spec but nothing else.
-    formatFailure (Just loc) Nothing reason = writeLine
-      (formatLocation loc ++ ":" ++ formatReason reason)
+locationToJSON :: Location -> A.Value
+locationToJSON loc = A.object
+  [ "file"   A..= (A.String . fromString $ locationFile loc)
+  , "line"   A..= (A.toJSON              $ locationLine loc)
+  , "column" A..= (A.toJSON              $ locationColumn loc)
+  ]
 
-    formatFailure Nothing (Just loc) reason = writeLine
-      (formatLocation loc ++ ":" ++ formatReason reason)
+secondsToJSON :: Seconds -> A.Value
+secondsToJSON (Seconds d) = A.toJSON d
 
-    -- If we have both locations, then we print the location of the failure
-    -- as the message at the location of the spec "it"
-    formatFailure (Just loc) (Just loc') reason = mapM_ writeLine
-      [ (formatLocation loc  ++ ":" ++ formatLocation loc' ++ "\NUL")
-      , (formatLocation loc' ++ ":" ++ formatReason reason)
-      ]
+resultToJSON :: Result -> A.Value
+resultToJSON Success = A.object
+  [ "type" A..= A.String "success" ]
+resultToJSON (Pending mLoc mStr) = A.object
+  [ "type"     A..= (A.String               $ "pending")
+  , "location" A..= (locationToJSON        <$> mLoc)
+  , "reason"   A..= (A.String . fromString <$> mStr)
+  ]
+resultToJSON (Failure mLoc reason) = A.object
+  [ "type"     A..= (A.String        $  "failure")
+  , "location" A..= (locationToJSON <$> mLoc)
+  , "reason"   A..= (failureReasonToJSON    $  reason)
+  ]
 
-formatReason :: FailureReason -> String
-formatReason NoReason = "\NUL"
-formatReason (Reason string) = removeNULs string ++ "\NUL"
-formatReason (ExpectedButGot mStr1 str2 str3) = removeNULs (unlines lines') ++ "\NUL"
-  where
-    -- FIXME what is the optional string and where should it go?
-    lines' = maybe id (:) mStr1 ["expected: " ++ str2, " but got: " ++ str3]
-formatReason (Error mStr someException) = removeNULs (unlines lines') ++ "\NUL"
-  where
-    -- FIXME what is the optional string and where should it go?
-    lines' = maybe id (:) mStr [show someException]
-
-formatLocation :: Location -> String
-formatLocation (Location file line column) = file ++ ":" ++ show line ++ ":" ++ show column
-
-removeNULs :: String -> String
-removeNULs = filter ((/=) '\NUL')
+failureReasonToJSON :: FailureReason -> A.Value
+failureReasonToJSON NoReason = A.object
+  [ "type" A..= A.String "none" ]
+failureReasonToJSON (Reason message) = A.object
+  [ "type"    A..= A.String "message"
+  , "message" A..= A.String (fromString message)
+  ]
+failureReasonToJSON (ExpectedButGot mStr1 str2 str3) = A.object
+  [ "type"     A..= (A.String               $  "expectation")
+  , "message"  A..= (A.String . fromString <$> mStr1)
+  , "expected" A..= (A.String . fromString  $  str2)
+  , "got"      A..= (A.String . fromString  $  str3)
+  ]
+failureReasonToJSON (Error mStr exception) = A.object
+  [ "type"    A..= (A.String                      $ "error")
+  , "message" A..= (A.String . fromString        <$> mStr)
+  , "error"   A..= (A.String . fromString . show  $  exception)
+  ]
